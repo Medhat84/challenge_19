@@ -6,8 +6,15 @@ setwd("~/R/R Directory/challenge_19");
 trainds <- read.csv("train.csv"); testds <- read.csv("test.csv");
 trainds$date <- ymd_h(trainds$date); testds$date <- ymd_h(testds$date);
 set.seed(145);
+
+inValid_starts <- seq(from = -11, to = 13176, by = 84);
+inValid <- inValid_starts;
+for (i in 1:47){inValid <- c(inValid,inValid_starts+i)};
+inValid <- sort(inValid[inValid>0]);
+
 stdev <- function(x, ...) {x<- x[!is.na(x)];sqrt(sum((x-mean(x))^2))/length(x)};
 der1 <- function(x) {y = x - lag(x);y[1] <- 0; return(y)};
+
 
 for (i in 1:6){
   traintest <- read.csv(paste0("wp",i,".csv"));
@@ -30,16 +37,16 @@ for (i in 1:6){
                                  wday = wday, hour = hour));
   
   
-  #traintest <- traintest %>% mutate(wsav_ma5 = rollmeanr(wsav, k = 5, fill = 0));
+  traintest <- traintest %>% mutate(ws_av_ma5 = rollmeanr(ws_av, k = 5, fill = 0));
   #traintest <- traintest %>% mutate(wsav_ma4 = rollmeanr(wsav, k = 4, fill = 0));
-  #traintest <- traintest %>% mutate(wsav_ma3 = rollmeanr(wsav, k = 3, fill = 0));
-  #traintest <- traintest %>% mutate(wsav_dt1 = wsav - lag(wsav));traintest$wsav_dt1[1] <- 0; 
-  #traintest <- traintest %>% mutate(wsav_dt2 = wsav_dt1 - lag(wsav_dt1));traintest$wsav_dt2[1] <- 0; 
+  traintest <- traintest %>% mutate(ws_av_ma3 = rollmeanr(ws_av, k = 3, fill = 0));
+  traintest <- traintest %>% mutate(ws_av_d1 = der1(ws_av));
+  traintest <- traintest %>% mutate(ws_av_d2 = der1(ws_av_d1));
   #traintest <- traintest %>% mutate(wsav_msd = rollapplyr(wsav, 4, sd, fill = 0));
   
   
   
-  inTest <- which(is.na(traintest[,"wp"])); inValid <- inTest-length(testds$date);
+  inTest <- which(is.na(traintest[,"wp"]));
   trainvalid <- traintest[-inTest,]; training <- trainvalid[-inValid,]; 
   valid <- trainvalid[inValid,]; test <- traintest[inTest,];
   assign(paste0("wp",i,"trainvalid"),trainvalid);
