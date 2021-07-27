@@ -31,11 +31,11 @@ for (i in 1:6){
   traintest$hour <- hour(traintest$date);
   traintest$wday <- wday(traintest$date);
   traintest$yday <- yday(traintest$date);
-  traintest <- traintest %>% mutate(ws_av_ma61 = rollmeanr(ws_av, k = 61, fill = 0));
+  traintest <- traintest %>% mutate(ws_av_ma5 = rollmeanr(ws_av, k = 5, fill = 0));
   traintest <- traintest %>% mutate(ws_av_ma4 = rollmeanr(ws_av, k = 4, fill = 0));
   traintest <- traintest %>% mutate(ws_av_ma3 = rollmeanr(ws_av, k = 3, fill = 0));
-  traintest <- traintest %>% mutate(wp_ma61 = rollmeanr(wp, k = 61, fill = 0, na.rm=TRUE));
-  traintest <- traintest %>% mutate(wp_ma61_ma8 = rollmeanr(wp_ma61, k = 8, fill = 0, na.rm=TRUE));
+  #traintest <- traintest %>% mutate(wp_ma61 = rollmeanr(wp, k = 61, fill = 0, na.rm=TRUE));
+  #traintest <- traintest %>% mutate(wp_ma61_ma8 = rollmeanr(wp_ma61, k = 8, fill = 0, na.rm=TRUE));
   traintest <- traintest %>% mutate(ws_av_d1 = der1(ws_av));
   traintest <- traintest %>% mutate(ws_av_d2 = der1(ws_av_d1));
   #traintest$ws3 <- traintest$ws_av^3;
