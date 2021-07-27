@@ -12,35 +12,39 @@ inValid <- inValid_starts;
 for (i in 1:47){inValid <- c(inValid,inValid_starts+i)};
 inValid <- sort(inValid[inValid>0]);
 
+stdev <- function(x, ...) {x<- x[!is.na(x)];sqrt(sum((x-mean(x))^2))/length(x)};
+der1 <- function(x) {y = x - lag(x);y[1] <- 0; return(y)};
 
 for (i in 1:6){
   traintest <- read.csv(paste0("wp",i,".csv"));
   traintest$date <- ymd_h(traintest$date) + hours(traintest$hors);
   traintest <- traintest %>% arrange(date, hors);
-  traintest <- traintest %>% group_by(date) %>% summarise(uav = mean(u, na.rm=TRUE),
-                                              vav = mean(v, na.rm=TRUE),
-                                              wsav = mean(ws, na.rm=TRUE),
-                                              wdav = mean(wd, na.rm=TRUE));
+  traintest <- traintest %>% group_by(date) %>% summarise(ws_av = mean(ws, na.rm=TRUE),
+                                                          wd_av = mean(wd, na.rm=TRUE),
+                                                          u_av = mean(u, na.rm=TRUE),
+                                                          v_av = mean(v, na.rm=TRUE),
+                                                          ws_sd = stdev(ws, na.rm=TRUE),
+                                                          wd_sd = stdev(wd, na.rm=TRUE));
   
   target <- trainds %>% select(date,wp=1+i);
   traintest <- traintest %>% left_join(target, by = "date");
   traintest$hour <- hour(traintest$date);
   traintest$wday <- wday(traintest$date);
-  #traintest <- traintest %>% mutate(wsav_ma5 = rollmeanr(wsav, k = 5, fill = 0));
-  #traintest <- traintest %>% mutate(wsav_ma4 = rollmeanr(wsav, k = 4, fill = 0));
-  traintest <- traintest %>% mutate(wsav_ma3 = rollmeanr(wsav, k = 3, fill = 0));
-  #traintest <- traintest %>% mutate(wp_ma49 = rollmeanr(wp, k = 49, fill = 0, na.rm=TRUE));
-  traintest <- traintest %>% mutate(wsav_d1 = wsav - lag(wsav));traintest$wsav_d1[1] <- 0; 
-  traintest <- traintest %>% mutate(wsav_d2 = wsav_d1 - lag(wsav_d1));traintest$wsav_d2[1] <- 0; 
-  #traintest <- traintest %>% mutate(wsav_msd = rollapplyr(wsav, 4, sd, fill = 0));
-  #traintest <- traintest %>% mutate(wp_ma49_ma8 = rollmeanr(wp_ma49, k = 8, fill = 0, na.rm=TRUE));
-  
+  traintest$yday <- yday(traintest$date);
+  traintest <- traintest %>% mutate(ws_av_ma61 = rollmeanr(ws_av, k = 61, fill = 0));
+  traintest <- traintest %>% mutate(ws_av_ma4 = rollmeanr(ws_av, k = 4, fill = 0));
+  traintest <- traintest %>% mutate(ws_av_ma3 = rollmeanr(ws_av, k = 3, fill = 0));
+  traintest <- traintest %>% mutate(wp_ma61 = rollmeanr(wp, k = 61, fill = 0, na.rm=TRUE));
+  traintest <- traintest %>% mutate(wp_ma61_ma8 = rollmeanr(wp_ma61, k = 8, fill = 0, na.rm=TRUE));
+  traintest <- traintest %>% mutate(ws_av_d1 = der1(ws_av));
+  traintest <- traintest %>% mutate(ws_av_d2 = der1(ws_av_d1));
+  #traintest$ws3 <- traintest$ws_av^3;
+  #traintest$ws2u <- traintest$ws_av^2*traintest$u_av;
+  #traintest$ws2v <- traintest$ws_av^2*traintest$v_av;
 
   
   
   inTest <- which(is.na(traintest[,"wp"])); 
-  #inValid <- 13141:length(trainvalid$date);
-  #inValid <- createDataPartition(y=trainvalid$wp,p=0.35, list=FALSE);
   trainvalid <- traintest[-inTest,]; training <- trainvalid[-inValid,]; 
   valid <- trainvalid[inValid,]; test <- traintest[inTest,];
   assign(paste0("wp",i,"trainvalid"),trainvalid);
@@ -56,7 +60,7 @@ for (i in 1:6){
   
   Valid_Pred <- predict(mdl, valid); 
   Valid_Pred[Valid_Pred < 0] <- 0;Valid_Pred[Valid_Pred > 1] <- 1;
-  print(cbind(ValidMAE = MAE(Valid_Pred,valid$wp), mdl$results[7]));
+  print(cbind(ValidMAE = MAE(Valid_Pred,valid$wp), mdlMAE = mdl$results$MAE));
   assign(paste0("Valid_Pred",i),Valid_Pred);
   Test_Pred <- predict(mdl, test); 
   Test_Pred[Test_Pred < 0] <- 0;Test_Pred[Test_Pred > 1] <- 1;
