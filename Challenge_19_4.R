@@ -2,15 +2,27 @@ library(parallel);library(doParallel);library(lubridate);library(dplyr);
 library(zoo);library(caret);
 clus <- makeCluster(detectCores()-2);
 registerDoParallel(clus);
+
 setwd("~/R/R Directory/challenge_19");
 trainds <- read.csv("train.csv"); testds <- read.csv("test.csv");
 trainds$date <- ymd_h(trainds$date); testds$date <- ymd_h(testds$date);
 set.seed(145);
 
-inValid_starts <- seq(from = -11, to = 13176, by = 84);
-inValid <- inValid_starts;
-for (i in 1:47){inValid <- c(inValid,inValid_starts+i)};
-inValid <- sort(inValid[inValid>0]);
+inValid_starts <- -11:36; inValid <- inValid_starts;
+inValid_starts_12 <- 1:36; inValid_12 <- inValid_starts_12;
+inValid_starts_24 <- 13:36; inValid_24 <- inValid_starts_24;
+inValid_starts_36 <- 25:36; inValid_36 <- inValid_starts_36;
+
+for (i in 1:156){inValid <- c(inValid,inValid_starts+84*i);
+inValid_12 <- c(inValid_12,inValid_starts_12+84*i);
+inValid_24 <- c(inValid_24,inValid_starts_24+84*i);
+inValid_36 <- c(inValid_36,inValid_starts_36+84*i)};
+
+inValid <- inValid[inValid>0]; inValid_12 <- inValid_12[inValid_12>36];
+inValid_24 <- inValid_24[inValid_24>36]; inValid_36 <- inValid_36[inValid_36>36];
+inValid_dates_12 <- trainds$date[inValid_12+1]; 
+inValid_dates_24 <- trainds$date[inValid_24+1];
+inValid_dates_36 <- trainds$date[inValid_36+1];
 
 stdev <- function(x, ...) {x<- x[!is.na(x)];sqrt(sum((x-mean(x))^2))/length(x)};
 der1 <- function(x) {y = x - lag(x);y[1] <- 0; return(y)};
@@ -20,29 +32,31 @@ for (i in 1:6){
   traintest <- read.csv(paste0("wp",i,".csv"));
   traintest$date <- ymd_h(traintest$date) + hours(traintest$hors);
   traintest <- traintest %>% arrange(date, hors);
+  traintest[(traintest$date %in% inValid_dates_12) & traintest$hors<13, 3:6] <- NA;
+  traintest[(traintest$date %in% inValid_dates_24) & traintest$hors<25 & traintest$hors>12, 3:6] <- NA;
+  traintest[(traintest$date %in% inValid_dates_36) & traintest$hors<37 & traintest$hors>24, 3:6] <- NA;
   traintest <- traintest %>% group_by(date) %>% select(-hors) %>% 
-    summarise_all(list(av = mean, sd = stdev),na.rm=TRUE);
+    summarise_all(list(av = mean),na.rm=TRUE);
                                               
   target <- trainds %>% select(date,wp=1+i);
   traintest <- traintest %>% left_join(target, by = "date");
-  traintest <- traintest %>% mutate(wp_ma49 = rollmeanr(wp, k = 49, fill = 0, na.rm=TRUE));
-  traintest <- traintest %>% mutate(wp_ma49_ma8 = rollmeanr(wp_ma49, k = 8, fill = 0, na.rm=TRUE));
   
   traintest <- traintest %>% 
-    mutate_at(vars(u_av:wd_sd),list(ma4 = rollmeanr),k = 4, fill = 0, na.rm=TRUE);
+    mutate_at(vars(ws_av:wd_av),list(ma4 = rollmeanr),k = 4, fill = 0, na.rm=TRUE);
+  
+  traintest <- traintest %>% 
+    mutate_at(vars(ws_av:wd_av),list(ma13 = rollmeanr),k = 13, fill = 0, na.rm=TRUE);
 
   
   traintest <- traintest %>% 
-    mutate_at(vars("date"), list(yday = yday, mday = mday, 
-                                 wday = wday, hour = hour));
+    mutate_at(vars("date"), list(yday = yday, hour = hour));
   
   
-  traintest <- traintest %>% mutate(ws_av_ma5 = rollmeanr(ws_av, k = 5, fill = 0));
-  #traintest <- traintest %>% mutate(wsav_ma4 = rollmeanr(wsav, k = 4, fill = 0));
-  traintest <- traintest %>% mutate(ws_av_ma3 = rollmeanr(ws_av, k = 3, fill = 0));
+  
+  #traintest <- traintest %>% mutate(ws_av_ma4 = rollmeanr(ws_av, k = 4, fill = 0));
+  #traintest <- traintest %>% mutate(ws_av_ma13 = rollmeanr(ws_av, k = 13, fill = 0));
   traintest <- traintest %>% mutate(ws_av_d1 = der1(ws_av));
   traintest <- traintest %>% mutate(ws_av_d2 = der1(ws_av_d1));
-  #traintest <- traintest %>% mutate(wsav_msd = rollapplyr(wsav, 4, sd, fill = 0));
   
   
   
@@ -54,17 +68,17 @@ for (i in 1:6){
   assign(paste0("wp",i,"valid"),valid);
   assign(paste0("wp",i,"test"),test);
   
-  mdl <- train(wp ~ ., method = "gbm", data = training, distribution = "laplace",
+  mdl <- train(wp^0.25 ~ ., method = "gbm", data = trainvalid, distribution = "laplace",
                metric="MAE",verbose=FALSE,tuneGrid=expand.grid(n.trees=150,
                                                                interaction.depth=4,
                                                                shrinkage=0.1,
                                                                n.minobsinnode=6));
   
-  Valid_Pred <- predict(mdl, valid); 
+  Valid_Pred <- (predict(mdl, valid))^4; 
   Valid_Pred[Valid_Pred < 0] <- 0;Valid_Pred[Valid_Pred > 1] <- 1;
   print(cbind(ValidMAE = MAE(Valid_Pred,valid$wp), mdl$results[7]));
   assign(paste0("Valid_Pred",i),Valid_Pred);
-  Test_Pred <- predict(mdl, test); 
+  Test_Pred <- (predict(mdl, test))^4; 
   Test_Pred[Test_Pred < 0] <- 0;Test_Pred[Test_Pred > 1] <- 1;
   assign(paste0("Test_Pred",i),Test_Pred); 
   }
