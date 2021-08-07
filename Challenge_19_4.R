@@ -1,5 +1,5 @@
 library(parallel);library(doParallel);library(lubridate);library(dplyr);
-library(zoo);library(caret);
+library(zoo);library(xgboost);library(caret);
 clus <- makeCluster(detectCores()-2);
 registerDoParallel(clus);
 
@@ -27,7 +27,6 @@ inValid_dates_36 <- trainds$date[inValid_36+1];
 stdev <- function(x, ...) {x<- x[!is.na(x)];sqrt(sum((x-mean(x))^2))/length(x)};
 der1 <- function(x) {y = x - lag(x);y[1] <- 0; return(y)};
 
-
 for (i in 1:6){
   traintest <- read.csv(paste0("wp",i,".csv"));
   traintest$date <- ymd_h(traintest$date) + hours(traintest$hors);
@@ -35,7 +34,7 @@ for (i in 1:6){
   traintest[(traintest$date %in% inValid_dates_12) & traintest$hors<13, 3:6] <- NA;
   traintest[(traintest$date %in% inValid_dates_24) & traintest$hors<25 & traintest$hors>12, 3:6] <- NA;
   traintest[(traintest$date %in% inValid_dates_36) & traintest$hors<37 & traintest$hors>24, 3:6] <- NA;
-  traintest <- traintest %>% group_by(date) %>% select(-hors) %>% 
+  traintest <- traintest %>% group_by(date) %>%  
     summarise_all(list(av = mean),na.rm=TRUE);
                                               
   target <- trainds %>% select(date,wp=1+i);
@@ -47,17 +46,12 @@ for (i in 1:6){
   traintest <- traintest %>% 
     mutate_at(vars(ws_av:wd_av),list(ma13 = rollmeanr),k = 13, fill = 0, na.rm=TRUE);
 
+  traintest <- traintest %>% mutate_at(vars(ws_av:wd_av),list(d1 = der1));
+  traintest <- traintest %>% mutate(ws_av_d2 = der1(ws_av_d1));
+  traintest <- traintest %>% mutate(wd_av_d2 = der1(wd_av_d1));
   
   traintest <- traintest %>% 
     mutate_at(vars("date"), list(yday = yday, hour = hour));
-  
-  
-  
-  #traintest <- traintest %>% mutate(ws_av_ma4 = rollmeanr(ws_av, k = 4, fill = 0));
-  #traintest <- traintest %>% mutate(ws_av_ma13 = rollmeanr(ws_av, k = 13, fill = 0));
-  traintest <- traintest %>% mutate(ws_av_d1 = der1(ws_av));
-  traintest <- traintest %>% mutate(ws_av_d2 = der1(ws_av_d1));
-  
   
   
   inTest <- which(is.na(traintest[,"wp"]));
@@ -68,17 +62,23 @@ for (i in 1:6){
   assign(paste0("wp",i,"valid"),valid);
   assign(paste0("wp",i,"test"),test);
   
-  mdl <- train(wp^0.25 ~ ., method = "gbm", data = trainvalid, distribution = "laplace",
-               metric="MAE",verbose=FALSE,tuneGrid=expand.grid(n.trees=150,
-                                                               interaction.depth=4,
-                                                               shrinkage=0.1,
-                                                               n.minobsinnode=6));
+
+  dtrain <- xgb.DMatrix(data =data.matrix(subset(training, select = -wp)), label = training$wp^(1/2));
+  dvalid <- xgb.DMatrix(data =data.matrix(subset(valid, select = -wp)));
+  dtest <- xgb.DMatrix(data =data.matrix(subset(test, select = -wp)));
   
-  Valid_Pred <- (predict(mdl, valid))^4; 
+  mdl <- xgboost(data = dtrain, nrounds = 150, max_depth = 4, eta = 0.11, 
+                 gamma = 0.01, colsample_bytree = 0.9, min_child_weight = 0,
+                 subsample = 0.8, objective = "reg:pseudohubererror",
+                 eval_metric = "mae", verbose = 0, early_stopping_rounds = 5);
+  
+  
+  
+  Valid_Pred <- (predict(mdl, dvalid))^2; 
   Valid_Pred[Valid_Pred < 0] <- 0;Valid_Pred[Valid_Pred > 1] <- 1;
-  print(cbind(ValidMAE = MAE(Valid_Pred,valid$wp), mdl$results[7]));
+  print(cbind(ValidMAE = MAE(Valid_Pred,valid$wp), mdlMAE = mdl$evaluation_log$train_mae[150]));
   assign(paste0("Valid_Pred",i),Valid_Pred);
-  Test_Pred <- (predict(mdl, test))^4; 
+  Test_Pred <- (predict(mdl, dtest))^2; 
   Test_Pred[Test_Pred < 0] <- 0;Test_Pred[Test_Pred > 1] <- 1;
   assign(paste0("Test_Pred",i),Test_Pred); 
   }
