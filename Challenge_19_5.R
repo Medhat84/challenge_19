@@ -8,10 +8,14 @@ trainds <- read.csv("train.csv"); testds <- read.csv("test.csv");
 trainds$date <- ymd_h(trainds$date); testds$date <- ymd_h(testds$date);
 set.seed(145);
 
-inValid <- which(seq(13139,0) %% 84 < 48);
-inValid_12 <- setdiff(which(seq(13139,0) %% 84 < 36), 1:36);
-inValid_24 <- setdiff(which(seq(13139,0) %% 84 < 24), 1:36);
-inValid_36 <- setdiff(which(seq(13139,0) %% 84 < 12), 1:36);
+inValid <- which(seq(13139,0) %% 168 < 48);
+#inValid_12 <- setdiff(which(seq(13139,0) %% 84 < 36), 1:36);
+#inValid_24 <- setdiff(which(seq(13139,0) %% 84 < 24), 1:36);
+#inValid_36 <- setdiff(which(seq(13139,0) %% 84 < 12), 1:36);
+
+inValid_12 <- setdiff(which(seq(13139,0) %% 168 < 36), 1:36);
+inValid_24 <- setdiff(which(seq(13139,0) %% 168 < 24), 1:36);
+inValid_36 <- setdiff(which(seq(13139,0) %% 168 < 12), 1:36);
 
 stdev <- function(x, ...) {x<- x[!is.na(x)];sqrt(sum((x-mean(x))^2))/length(x)};
 der1 <- function(x) {y = x - lag(x);y[1] <- 0; return(y)};
@@ -45,6 +49,8 @@ for (i in 1:6){
   traintest <- traintest %>% 
     mutate_at(vars("date"), list(yday = yday, hour = hour));
   
+  traintest <- traintest %>% mutate(hour_yday = as.numeric(paste0(hour,yday)));
+  
   
   inTest <- which(is.na(traintest[,"wp"]));
   trainvalid <- traintest[-inTest,]; training <- trainvalid[-inValid,]; 
@@ -62,11 +68,11 @@ for (i in 1:6){
   dtest_cat <- catboost.load_pool(data.matrix(subset(test, select = -wp)));
   
   mdl_cat <- catboost.train(dtrain_cat, dvalid_cat, 
-                            params = list(iterations = 300, learning_rate = 0.1, 
-                                          depth = 6, logging_level = 'Silent', 
-                                          l2_leaf_reg = 0.1, rsm = 1, 
-                                          loss_function = 'MAE', 
-                                          od_type = 'Iter', od_wait = 30));
+                            params = list(iterations = 1000, learning_rate = 0.1, 
+                                          depth = 4, logging_level = 'Silent', 
+                                          l2_leaf_reg = 0.2, rsm = 1, 
+                                          loss_function = 'MAE', od_type = 'Iter',
+                                          od_wait = 100, subsample = 0.8));
   
   dtrain_lgbm <- lgb.Dataset(data =data.matrix(subset(training, select = -wp)), 
                              label = training$wp^(1/3));
@@ -75,7 +81,7 @@ for (i in 1:6){
   dtest_lgbm <- data.matrix(subset(test, select = -wp));
   
   mdl_lgbm <- lightgbm(data = dtrain_lgbm, nrounds = 150, boosting_type = 'gbdt',
-                       verbose = -1, learning_rate = 0.1, max_depth = 8, 
+                       verbose = -1, learning_rate = 0.1, max_depth = 10, 
                        valids = list(valids = dvalid_lgbm),
                        obj = "regression_l1", early_stopping_rounds = 15);
   
@@ -85,17 +91,18 @@ for (i in 1:6){
                             label = valid$wp^(1/2));
   dtest_xgb <- xgb.DMatrix(data =data.matrix(subset(test, select = -wp)));
   
-  mdl_xgb <- xgb.train(data = dtrain_xgb, nrounds = 200, early_stopping_rounds = 20, 
+  mdl_xgb <- xgb.train(data = dtrain_xgb, nrounds = 500, early_stopping_rounds = 50, 
                        watchlist = list(train = dtrain_xgb, eval = dvalid_xgb), verbose = 0,
                        params = list(max_depth = 4, eta = 0.11, gamma = 0.01,
                                      colsample_bytree = 1, min_child_weight = 0,
-                                     subsample = 0.8, eval_metric = "mae",
-                                     objective = "reg:pseudohubererror"));
+                                     subsample = 0.8, objective = "reg:pseudohubererror",
+                                     eval_metric = "mae"));
   
   
   Valid_Pred_cat <- catboost.predict(mdl_cat, dvalid_cat)^4; 
   Valid_Pred_lgbm <- predict(mdl_lgbm, data.matrix(subset(valid, select = -wp)))^3; 
   Valid_Pred_xgb <- predict(mdl_xgb, dvalid_xgb)^2; 
+  
   
   Valid_Pred <- (Valid_Pred_cat + Valid_Pred_lgbm + Valid_Pred_xgb)/3;
   Valid_Pred[Valid_Pred < 0] <- 0;Valid_Pred[Valid_Pred > 1] <- 1;
