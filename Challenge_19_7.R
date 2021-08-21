@@ -8,14 +8,9 @@ trainds <- read.csv("train.csv"); testds <- read.csv("test.csv");
 trainds$date <- ymd_h(trainds$date); testds$date <- ymd_h(testds$date);
 set.seed(145);
 
-#inValid <- 6552+which(seq(6623,0) %% 96 < 48);
-#inValid_12 <- 6552+which(seq(6623,0) %% 96 < 36);
-#inValid_24 <- 6552+which(seq(6623,0) %% 96 < 24);
-#inValid_36 <- 6552+which(seq(6623,0) %% 96 < 12);
-
-#inValid_12 <- 13141 + which(seq(18720,13142) %% 36 < 27);
-#inValid_24 <- 13141 + which(seq(18720,13142) %% 36 < 18);
-#inValid_36 <- 13141 + which(seq(18720,13142) %% 36 < 9);
+#inValid_12 <- 13140 + which(seq(18719,13139) %% 36 < 27);
+#inValid_24 <- 13140 + which(seq(18719,13139) %% 36 < 18);
+#inValid_36 <- 13140 + which(seq(18719,13139) %% 36 < 9);
 
 stdev <- function(x, ...) {x<- x[!is.na(x)];sqrt(sum((x-mean(x))^2))/length(x)};
 der1 <- function(x) {y = x - lag(x);y[1] <- 0; return(y)};
@@ -24,14 +19,14 @@ Valid_Prediction <- vector(); wp_valid <- vector();
 Test_Prediction <- read.csv("contribution_example.csv",sep = ";");
 
 
-for (i in 1:1){
+for (i in 1:6){
   traintest <- read.csv(paste0("wp",i,".csv"));
   traintest$date <- ymd_h(traintest$date) + hours(traintest$hors);
   traintest <- traintest %>% arrange(date, hors);
   
-  #traintest[(traintest$date %in% trainds$date[inValid_12+1]) & traintest$hors<13, 3:6] <- NA;
-  #traintest[(traintest$date %in% trainds$date[inValid_24+1]) & traintest$hors<25 & traintest$hors>12, 3:6] <- NA;
-  #traintest[(traintest$date %in% trainds$date[inValid_36+1]) & traintest$hors<37 & traintest$hors>24, 3:6] <- NA;
+  #traintest[(traintest$date %in% trainds$date[inValid_12+1]) & traintest$hors<9, 3:6] <- NA;
+  #traintest[(traintest$date %in% trainds$date[inValid_24+1]) & traintest$hors<19 & traintest$hors>9, 3:6] <- NA;
+  #traintest[(traintest$date %in% trainds$date[inValid_36+1]) & traintest$hors<28 & traintest$hors>19, 3:6] <- NA;
   
   traintest <- traintest %>% group_by(date) %>%  
     summarise_all(list(av = mean), na.rm=TRUE);
@@ -125,7 +120,7 @@ for (i in 1:1){
   
   Test_Pred <- (Test_Pred_cat + Test_Pred_lgbm + Test_Pred_xgb)/3;
   Test_Pred[Test_Pred < 0] <- 0;Test_Pred[Test_Pred > 1] <- 1;
-  Test_Prediction[,i+1] <- Test_Pred;
+  Test_Prediction[inTest, i+1] <- Test_Pred;
   
   for (j in 1:154){
     training <- rbind(training,valid); 
@@ -188,7 +183,7 @@ for (i in 1:1){
     
     Test_Pred <- (Test_Pred_cat + Test_Pred_lgbm + Test_Pred_xgb)/3;
     Test_Pred[Test_Pred < 0] <- 0;Test_Pred[Test_Pred > 1] <- 1;
-    Test_Prediction[,i+1] <- Test_Pred;
+    Test_Prediction[inTest, i+1] <- Test_Pred;
   }
   print(MAE(Valid_Prediction,wp_valid));
   
