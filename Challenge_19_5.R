@@ -8,14 +8,14 @@ trainds <- read.csv("train.csv"); testds <- read.csv("test.csv");
 trainds$date <- ymd_h(trainds$date); testds$date <- ymd_h(testds$date);
 set.seed(145);
 
-inValid <- which(seq(13139,0) %% 168 < 48);
-#inValid_12 <- setdiff(which(seq(13139,0) %% 84 < 36), 1:36);
-#inValid_24 <- setdiff(which(seq(13139,0) %% 84 < 24), 1:36);
-#inValid_36 <- setdiff(which(seq(13139,0) %% 84 < 12), 1:36);
+inValid <- 13177:18720;
+inValid_12 <- setdiff(which(seq(13139,0) %% 84 < 36), 1:36);
+inValid_24 <- setdiff(which(seq(13139,0) %% 84 < 24), 1:36);
+inValid_36 <- setdiff(which(seq(13139,0) %% 84 < 12), 1:36);
 
-inValid_12 <- setdiff(which(seq(13139,0) %% 168 < 36), 1:36);
-inValid_24 <- setdiff(which(seq(13139,0) %% 168 < 24), 1:36);
-inValid_36 <- setdiff(which(seq(13139,0) %% 168 < 12), 1:36);
+#inValid_12 <- setdiff(which(seq(13139,0) %% 168 < 36), 1:36);
+#inValid_24 <- setdiff(which(seq(13139,0) %% 168 < 24), 1:36);
+#inValid_36 <- setdiff(which(seq(13139,0) %% 168 < 12), 1:36);
 
 stdev <- function(x, ...) {x<- x[!is.na(x)];sqrt(sum((x-mean(x))^2))/length(x)};
 der1 <- function(x) {y = x - lag(x);y[1] <- 0; return(y)};
@@ -27,9 +27,9 @@ for (i in 1:6){
   traintest <- read.csv(paste0("wp",i,".csv"));
   traintest$date <- ymd_h(traintest$date) + hours(traintest$hors);
   traintest <- traintest %>% arrange(date, hors);
-  traintest[(traintest$date %in% trainds$date[inValid_12+1]) & traintest$hors<13, 3:6] <- NA;
-  traintest[(traintest$date %in% trainds$date[inValid_24+1]) & traintest$hors<25 & traintest$hors>12, 3:6] <- NA;
-  traintest[(traintest$date %in% trainds$date[inValid_36+1]) & traintest$hors<37 & traintest$hors>24, 3:6] <- NA;
+  #traintest[(traintest$date %in% trainds$date[inValid_12+1]) & traintest$hors<13, 3:6] <- NA;
+  #traintest[(traintest$date %in% trainds$date[inValid_24+1]) & traintest$hors<25 & traintest$hors>12, 3:6] <- NA;
+  #traintest[(traintest$date %in% trainds$date[inValid_36+1]) & traintest$hors<37 & traintest$hors>24, 3:6] <- NA;
   traintest <- traintest %>% group_by(date) %>%  
     summarise_all(list(av = mean), na.rm=TRUE);
                                               
@@ -46,11 +46,14 @@ for (i in 1:6){
   traintest <- traintest %>% mutate(ws_av_d2 = der1(ws_av_d1));
   traintest <- traintest %>% mutate(wd_av_d2 = der1(wd_av_d1));
   
+  traintest <- traintest %>% mutate(ws_av3 = ws_av^3);
+ 
+  
   traintest <- traintest %>% 
-    mutate_at(vars("date"), list(yday = yday, hour = hour));
+    mutate_at(vars("date"), list(yday = yday, hour = hour, week = week, wday = wday));
   
-  traintest <- traintest %>% mutate(hour_yday = as.numeric(paste0(hour,yday)));
-  
+  traintest <- traintest %>% mutate(yday_hour = as.numeric(paste0(yday,hour)));
+
   
   inTest <- which(is.na(traintest[,"wp"]));
   trainvalid <- traintest[-inTest,]; training <- trainvalid[-inValid,]; 
