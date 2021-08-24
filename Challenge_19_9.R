@@ -39,15 +39,20 @@ for (i in 1:6){
   
   rm("tmpa","tmpb","tmpc","a","b","c")
   
-  traintest[inTrain_9, names(traintest) %in% c("u", "v", "ws", "wd")] <- NA;
-  traintest[inTrain_18, names(traintest) %in% c("u12", "v12", "ws12", "wd12")] <- NA;
-  traintest[inTrain_27, names(traintest) %in% c("u24", "v24", "ws24", "wd24")] <- NA;
+  #traintest[inTrain_9, names(traintest) %in% c("u", "v", "ws", "wd")] <- NA;
+  #traintest[inTrain_18, names(traintest) %in% c("u12", "v12", "ws12", "wd12")] <- NA;
+  #traintest[inTrain_27, names(traintest) %in% c("u24", "v24", "ws24", "wd24")] <- NA;
   
+  #traintest <- traintest %>% 
+   # mutate(u_av = rowMeans(cbind(u, u12, u24, u36), na.rm = TRUE));
+  #traintest <- traintest %>% 
+   # mutate(v_av = rowMeans(cbind(v, v12, v24, v36), na.rm = TRUE));
   traintest <- traintest %>% 
     mutate(ws_av = rowMeans(cbind(ws, ws12, ws24, ws36), na.rm = TRUE));
-  
   traintest <- traintest %>% 
     mutate(wd_av = rowMeans(cbind(wd, wd12, wd24, wd36), na.rm = TRUE));
+  
+  traintest <- subset(traintest, select = c(datetime:date, ws36:wd36, ws_av:wd_av));
   
   traintest <- traintest %>%
     mutate_at(vars(ws_av:wd_av),list(ma5 = rollmeanr), k = 5, fill = 0, na.rm=TRUE);
@@ -61,6 +66,10 @@ for (i in 1:6){
   
   traintest <- traintest %>% mutate(ws_av3 = ws_av^3);
   
+  #traintest <- traintest %>% left_join(
+  # traintest %>% group_by(date) %>% summarise_at(vars(ws36:wd36, ws_av:wd_av), list(mx12 = max, mn12 = min), na.rm=TRUE),
+  #by = "date");
+  
   traintest <- traintest %>% 
     mutate_at(vars("datetime"), list(hour = hour, yday = yday, week = week, wday = wday));
   
@@ -68,7 +77,7 @@ for (i in 1:6){
   traintest <- traintest %>% left_join(target, by = "datetime");
 
   
-  inValid <- 13141:13176; inTrain <- 1:13140;
+  inValid <- 13141:18720; inTrain <- 1:13140;
   inTest <- which(is.na(traintest[,"wp"])); 
   testing <- traintest[inTest,]; trainvalid <- traintest[-inTest,]; 
   training <- trainvalid[inTrain,]; valid <- trainvalid[inValid,]; 
@@ -143,8 +152,8 @@ for (i in 1:6){
       break
     }
     
-    training <- rbind(training,valid); 
-    inValid <- inValid + 36; inTest <- inTest + 48; 
+    training <- rbind(training,valid[1:36, ]); 
+    inValid <- inValid[-(1:36)]; inTest <- inTest + 48; 
     valid <- trainvalid[inValid,]; test <- testing[inTest,];
   }
   print(MAE(Valid_Prediction,wp_valid));
