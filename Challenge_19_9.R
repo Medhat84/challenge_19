@@ -8,9 +8,10 @@ trainds <- read.csv("train.csv"); testds <- read.csv("test.csv");
 trainds$datetime <- ymd_h(trainds$date); trainds <- trainds[c(8,2:7)]
 set.seed(145);
 
-inTrain_9 <- 9+which(seq(26159,0) %% 84 > 56);
-inTrain_18 <- 18+which(seq(26159,0) %% 84 > 65);
-inTrain_27 <- 27+which(seq(26159,0) %% 84 > 74);
+
+#inTrain_9 <- 9+which(seq(26159,0) %% 84 > 56);
+#inTrain_18 <- 18+which(seq(26159,0) %% 84 > 65);
+#inTrain_27 <- 27+which(seq(26159,0) %% 84 > 74);
 
 stdev <- function(x, ...) {x<- x[!is.na(x)];sqrt(sum((x-mean(x))^2))/length(x)};
 der1 <- function(x) {y = x - lag(x);y[1] <- 0; return(y)};
@@ -52,7 +53,7 @@ for (i in 1:6){
   traintest <- traintest %>% 
     mutate(wd_av = rowMeans(cbind(wd, wd12, wd24, wd36), na.rm = TRUE));
   
-  traintest <- subset(traintest, select = c(datetime:date, ws36:wd36, ws_av:wd_av));
+  traintest <- subset(traintest, select = c(datetime:hors, ws36:wd36, ws_av:wd_av));
   
   traintest <- traintest %>%
     mutate_at(vars(ws_av:wd_av),list(ma5 = rollmeanr), k = 5, fill = 0, na.rm=TRUE);
@@ -77,10 +78,11 @@ for (i in 1:6){
   traintest <- traintest %>% left_join(target, by = "datetime");
 
   
-  inValid <- 13141:18720; inTrain <- 1:13140;
+  inTrain <- which(seq(26159,0) %% 84 > 47 & seq(1, 26160) < 13177);
+  inValid <- which(seq(26159,0) %% 84 > 47 & seq(1, 26160) > 13176);
   inTest <- which(is.na(traintest[,"wp"])); 
   testing <- traintest[inTest,]; trainvalid <- traintest[-inTest,]; 
-  training <- trainvalid[inTrain,]; valid <- trainvalid[inValid,]; 
+  training <- traintest[inTrain,]; valid <- traintest[inValid,]; 
   assign(paste0("wp",i,"trainvalid"),trainvalid);
   assign(paste0("wp",i,"train"),training); 
   assign(paste0("wp",i,"valid"),valid);
@@ -153,8 +155,9 @@ for (i in 1:6){
     }
     
     training <- rbind(training,valid[1:36, ]); 
-    inValid <- inValid[-(1:36)]; inTest <- inTest + 48; 
-    valid <- trainvalid[inValid,]; test <- testing[inTest,];
+    valid <- rbind(valid, training[1:36, ]);
+    training <- training[-(1:36), ]; valid <- valid[-(1:36), ];
+    inTest <- inTest + 48; test <- testing[inTest,];
   }
   print(MAE(Valid_Prediction,wp_valid));
   
