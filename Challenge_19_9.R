@@ -44,6 +44,11 @@ for (i in 1:6){
   #traintest[inTrain_18, names(traintest) %in% c("u12", "v12", "ws12", "wd12")] <- NA;
   #traintest[inTrain_27, names(traintest) %in% c("u24", "v24", "ws24", "wd24")] <- NA;
   
+  #traintest <- traintest %>% mutate(unr = coalesce(u, u12, u24, u36));
+  #traintest <- traintest %>% mutate(vnr = coalesce(v, v12, v24, v36));
+  traintest <- traintest %>% mutate(wsnr = coalesce(ws, ws12, ws24, ws36));
+  traintest <- traintest %>% mutate(wdnr = coalesce(wd, wd12, wd24, wd36));
+  
   #traintest <- traintest %>% 
    # mutate(u_av = rowMeans(cbind(u, u12, u24, u36), na.rm = TRUE));
   #traintest <- traintest %>% 
@@ -53,23 +58,16 @@ for (i in 1:6){
   traintest <- traintest %>% 
     mutate(wd_av = rowMeans(cbind(wd, wd12, wd24, wd36), na.rm = TRUE));
   
-  traintest <- subset(traintest, select = c(datetime:hors, ws36:wd36, ws_av:wd_av));
+  traintest <- subset(traintest, select = c(datetime:hors, wsnr:wdnr, ws_av:wd_av));
   
   traintest <- traintest %>%
-    mutate_at(vars(ws_av:wd_av),list(ma5 = rollmeanr), k = 5, fill = 0, na.rm=TRUE);
-  
+    mutate_at(vars(wsnr:wdnr),list(ma4 = rollmeanr), k = 4, fill = 0, na.rm=TRUE);
   traintest <- traintest %>% 
-    mutate_at(vars(ws_av:wd_av),list(ma13 = rollmeanr), k = 13, fill = 0, na.rm=TRUE);
-  
-  traintest <- traintest %>% mutate_at(vars(ws_av:wd_av),list(d1 = der1));
-  traintest <- traintest %>% mutate(ws_av_d2 = der1(ws_av_d1));
-  traintest <- traintest %>% mutate(wd_av_d2 = der1(wd_av_d1));
-  
-  traintest <- traintest %>% mutate(ws_av3 = ws_av^3);
-  
-  #traintest <- traintest %>% left_join(
-  # traintest %>% group_by(date) %>% summarise_at(vars(ws36:wd36, ws_av:wd_av), list(mx12 = max, mn12 = min), na.rm=TRUE),
-  #by = "date");
+    mutate_at(vars(wsnr:wdnr),list(ma13 = rollmeanr), k = 13, fill = 0, na.rm=TRUE);
+  traintest <- traintest %>% mutate_at(vars(wsnr:wdnr),list(d1 = der1));
+  traintest <- traintest %>% mutate(wsnr_d2 = der1(wsnr_d1));
+  traintest <- traintest %>% mutate(wdnr_d2 = der1(wdnr_d1));
+  traintest <- traintest %>% mutate(wsnr3 = wsnr^3);
   
   traintest <- traintest %>% 
     mutate_at(vars("datetime"), list(hour = hour, yday = yday, week = week, wday = wday));
@@ -78,11 +76,10 @@ for (i in 1:6){
   traintest <- traintest %>% left_join(target, by = "datetime");
 
   
-  inTrain <- which(seq(26159,0) %% 84 > 47 & seq(1, 26160) < 13177);
-  inValid <- which(seq(26159,0) %% 84 > 47 & seq(1, 26160) > 13176);
+  inValid <- 13141:18720; inTrain <- 1:13140;
   inTest <- which(is.na(traintest[,"wp"])); 
   testing <- traintest[inTest,]; trainvalid <- traintest[-inTest,]; 
-  training <- traintest[inTrain,]; valid <- traintest[inValid,]; 
+  training <- trainvalid[inTrain,]; valid <- trainvalid[inValid,];
   assign(paste0("wp",i,"trainvalid"),trainvalid);
   assign(paste0("wp",i,"train"),training); 
   assign(paste0("wp",i,"valid"),valid);
@@ -155,9 +152,8 @@ for (i in 1:6){
     }
     
     training <- rbind(training,valid[1:36, ]); 
-    valid <- rbind(valid, training[1:36, ]);
-    training <- training[-(1:36), ]; valid <- valid[-(1:36), ];
-    inTest <- inTest + 48; test <- testing[inTest,];
+    inValid <- inValid[-(1:36)]; inTest <- inTest + 48; 
+    valid <- trainvalid[inValid,]; test <- testing[inTest,];
   }
   print(MAE(Valid_Prediction,wp_valid));
   
