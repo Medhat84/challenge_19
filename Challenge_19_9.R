@@ -44,21 +44,21 @@ for (i in 1:6){
   #traintest[inTrain_18, names(traintest) %in% c("u12", "v12", "ws12", "wd12")] <- NA;
   #traintest[inTrain_27, names(traintest) %in% c("u24", "v24", "ws24", "wd24")] <- NA;
   
-  #traintest <- traintest %>% mutate(unr = coalesce(u, u12, u24, u36));
-  #traintest <- traintest %>% mutate(vnr = coalesce(v, v12, v24, v36));
+  traintest <- traintest %>% mutate(unr = coalesce(u, u12, u24, u36));
+  traintest <- traintest %>% mutate(vnr = coalesce(v, v12, v24, v36));
   traintest <- traintest %>% mutate(wsnr = coalesce(ws, ws12, ws24, ws36));
   traintest <- traintest %>% mutate(wdnr = coalesce(wd, wd12, wd24, wd36));
   
-  #traintest <- traintest %>% 
-   # mutate(u_av = rowMeans(cbind(u, u12, u24, u36), na.rm = TRUE));
-  #traintest <- traintest %>% 
-   # mutate(v_av = rowMeans(cbind(v, v12, v24, v36), na.rm = TRUE));
+  traintest <- traintest %>% 
+    mutate(u_av = rowMeans(cbind(u, u12, u24, u36), na.rm = TRUE));
+  traintest <- traintest %>% 
+    mutate(v_av = rowMeans(cbind(v, v12, v24, v36), na.rm = TRUE));
   traintest <- traintest %>% 
     mutate(ws_av = rowMeans(cbind(ws, ws12, ws24, ws36), na.rm = TRUE));
   traintest <- traintest %>% 
     mutate(wd_av = rowMeans(cbind(wd, wd12, wd24, wd36), na.rm = TRUE));
   
-  traintest <- subset(traintest, select = c(datetime:hors, wsnr:wdnr, ws_av:wd_av));
+  traintest <- subset(traintest, select = c(datetime:hors, unr:wdnr, u_av:wd_av));
   
   traintest <- traintest %>%
     mutate_at(vars(wsnr:wdnr),list(ma4 = rollmeanr), k = 4, fill = 0, na.rm=TRUE);
@@ -76,6 +76,10 @@ for (i in 1:6){
                                          ungroup %>%
                                          select(datetime, wsnr_maf5, wdnr_maf5), 
                                        by = "datetime");
+  
+  traintest <- traintest %>% left_join(
+    traintest %>% group_by(date) %>% summarise_at(vars(wsnr:wdnr), list(av12 = mean)),
+    by = "date");
   
   traintest <- traintest %>% 
     mutate_at(vars("datetime"), list(hour = hour, yday = yday, week = week, wday = wday));
