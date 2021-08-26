@@ -69,6 +69,14 @@ for (i in 1:6){
   traintest <- traintest %>% mutate(wdnr_d2 = der1(wdnr_d1));
   traintest <- traintest %>% mutate(wsnr3 = wsnr^3);
   
+  traintest <- traintest %>% left_join(traintest %>% group_by(date) %>% 
+                                         mutate_at(vars(wsnr:wdnr), list(maf5 = rollapply), 
+                                                   FUN = mean, width = 5, partial = TRUE, 
+                                                   align = "left") %>% 
+                                         ungroup %>%
+                                         select(datetime, wsnr_maf5, wdnr_maf5), 
+                                       by = "datetime");
+  
   traintest <- traintest %>% 
     mutate_at(vars("datetime"), list(hour = hour, yday = yday, week = week, wday = wday));
   
