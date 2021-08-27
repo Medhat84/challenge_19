@@ -16,6 +16,8 @@ set.seed(145);
 stdev <- function(x, ...) {x<- x[!is.na(x)];sqrt(sum((x-mean(x))^2))/length(x)};
 der1 <- function(x) {y = x - lag(x);y[1] <- 0; return(y)};
 der2 <- function(x) {y = der1(x) - lag(der1(x));y[1] <- 0; return(y)};
+der1f <- function(x) {y = lead(x) - x; return(y)};
+der2f <- function(x) {y = lead(der1f(x)) - der1f(x); return(y)};
 
 Valid_Prediction <- vector(); wp_valid <- vector();
 Test_Prediction <- read.csv("contribution_example.csv",sep = ";");
@@ -59,22 +61,31 @@ for (i in 1:6){
   traintest <- traintest %>% 
     mutate(wd_av = rowMeans(cbind(wd, wd12, wd24, wd36), na.rm = TRUE));
   
-  traintest <- subset(traintest, select = -c(u:wd, u12:wd12, u24:wd24));
+  traintest <- subset(traintest, select = -c(u:wd36));
   
   traintest <- traintest %>% mutate(wsnr3 = wsnr^3, ws_av3 = ws_av^3);
   
   traintest <- traintest %>% left_join(traintest %>% group_by(date) %>% 
-                                         mutate_at(vars(wsnr:wdnr, ws_av:ws_av3), 
+                                         mutate_at(vars(wsnr:wdnr, wsnr3), 
                                                    list(maf5 = rollapply), 
                                                    FUN = mean, width = 5, 
                                                    partial = TRUE, align = "left") %>% 
                                          ungroup %>%
-                                         select(datetime, wsnr_maf5:ws_av3_maf5), 
+                                         select(datetime, wsnr_maf5, wdnr_maf5, wsnr3_maf5), 
                                        by = "datetime");
   
-  traintest <- traintest %>% left_join(
-    traintest %>% group_by(date) %>% summarise_at(vars(wsnr:wdnr, ws_av:ws_av3), 
-                                                  list(av12 = mean)), by = "date");
+  traintest <- traintest %>% left_join(traintest %>% group_by(date) %>% 
+                                         mutate_at(vars(wsnr:wdnr, wsnr3), 
+                                                   list(d1f = der1f, d2f = der2f)) %>% 
+                                         ungroup %>%
+                                         select(datetime, wsnr_d1f:wsnr3_d2f), 
+                                       by = "datetime");
+  
+  #traintest <- traintest %>% left_join(
+   # traintest %>% group_by(date) %>% summarise_at(vars(wsnr:wdnr, wsnr3), 
+    #                                              list(av12 = mean, mx12 = max,
+     #                                                  mn12 = min, sd12 = stdev)), 
+    #by = "date");
   
   traintest <- traintest %>%
     mutate_at(vars(wsnr:wdnr),list(ma4 = rollmeanr), k = 4, fill = 0, na.rm=TRUE);
@@ -84,12 +95,13 @@ for (i in 1:6){
     mutate_at(vars(wsnr3:ws_av3),list(ma10 = rollmeanr), k = 10, fill = 0, na.rm=TRUE);
   traintest <- traintest %>% 
     mutate_at(vars(wsnr:wdnr),list(ma13 = rollmeanr), k = 13, fill = 0, na.rm=TRUE);
-  traintest <- traintest %>% mutate_at(vars(wsnr:wdnr, ws_av:ws_av3),list(d1 = der1));
-  traintest <- traintest %>% mutate_at(vars(wsnr:wdnr, ws_av:ws_av3),list(d2 = der2));
+  traintest <- traintest %>% mutate_at(vars(wsnr:wdnr, wsnr3),list(d1 = der1));
+  traintest <- traintest %>% mutate_at(vars(wsnr:wdnr, wsnr3),list(d2 = der2));
+  
   
   traintest <- traintest %>% 
     mutate_at(vars("datetime"), list(hour = hour, yday = yday, week = week, 
-                                     month, mday, year, wday = wday));
+                                     wday = wday));
   
   target <- trainds %>% select(datetime, wp = 1+i);
   traintest <- traintest %>% left_join(target, by = "datetime");
