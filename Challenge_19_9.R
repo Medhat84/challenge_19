@@ -103,18 +103,46 @@ for (i in 1:6){
     mutate_at(vars("datetime"), list(hour = hour, yday = yday, week = week, 
                                      wday = wday));
   
+  
+  assign(paste0("wp",i,"traintest"), traintest);
+}
+
+
+for (i in 1:6){
+  
+  traintest <- get(paste0("wp",i,"traintest"));
+  
+  if (i == 1){
+    traintest <- traintest %>% left_join(wp4traintest, by = "datetime") %>% 
+      left_join(wp6traintest, by = "datetime");
+  }
+  if (i == 4){
+    traintest <- traintest %>% left_join(wp1traintest, by = "datetime") %>% 
+      left_join(wp5traintest, by = "datetime");
+  }
+  if (i == 5){
+    traintest <- traintest %>% left_join(wp1traintest, by = "datetime") %>% 
+      left_join(wp4traintest, by = "datetime");
+  }
+  if (i == 6){
+    traintest <- traintest %>% left_join(wp1traintest, by = "datetime") %>% 
+      left_join(wp2traintest, by = "datetime") %>% 
+      left_join(wp4traintest, by = "datetime") %>% 
+      left_join(wp5traintest, by = "datetime");
+  }
+  
   target <- trainds %>% select(datetime, wp = 1+i);
   traintest <- traintest %>% left_join(target, by = "datetime");
-
+  
   
   inValid <- 13141:18720; inTrain <- 1:13140;
   inTest <- which(is.na(traintest[,"wp"])); 
   testing <- traintest[inTest,]; trainvalid <- traintest[-inTest,]; 
   training <- trainvalid[inTrain,]; valid <- trainvalid[inValid,];
-  assign(paste0("wp",i,"trainvalid"),trainvalid);
-  assign(paste0("wp",i,"train"),training); 
-  assign(paste0("wp",i,"valid"),valid);
-  assign(paste0("wp",i,"test"),testing);
+  #assign(paste0("wp",i,"trainvalid"),trainvalid);
+  #assign(paste0("wp",i,"train"),training); 
+  #assign(paste0("wp",i,"valid"),valid);
+  #assign(paste0("wp",i,"test"),testing);
   
   inTest <- 1:48; test <- testing[inTest,];
   
