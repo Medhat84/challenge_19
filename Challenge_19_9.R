@@ -81,11 +81,11 @@ for (i in 1:6){
                                          select(datetime, wsnr_d1f:wsnr3_d2f), 
                                        by = "datetime");
   
-  #traintest <- traintest %>% left_join(
-   # traintest %>% group_by(date) %>% summarise_at(vars(wsnr:wdnr, wsnr3), 
-    #                                              list(av12 = mean, mx12 = max,
-     #                                                  mn12 = min, sd12 = stdev)), 
-    #by = "date");
+  traintest <- traintest %>% left_join(
+    traintest %>% group_by(date) %>% summarise_at(vars(wsnr:wdnr, wsnr3), 
+                                                  list(av12 = mean, mx12 = max,
+                                                       mn12 = min)), 
+    by = "date");
   
   traintest <- traintest %>%
     mutate_at(vars(wsnr:wdnr),list(ma4 = rollmeanr), k = 4, fill = 0, na.rm=TRUE);
