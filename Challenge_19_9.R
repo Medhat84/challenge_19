@@ -1,6 +1,6 @@
 library(lightgbm);library(parallel);library(doParallel);library(lubridate);
 library(dplyr);library(zoo);library(caret);library(xgboost);library(catboost);
-clus <- makeCluster(detectCores()-2);
+clus <- makeCluster(detectCores()-0);
 registerDoParallel(clus);
 
 setwd("~/R/R Directory/challenge_19");
@@ -19,7 +19,7 @@ der2 <- function(x) {y = der1(x) - lag(der1(x));y[1] <- 0; return(y)};
 der1f <- function(x) {y = lead(x) - x; return(y)};
 der2f <- function(x) {y = lead(der1f(x)) - der1f(x); return(y)};
 
-Valid_Prediction <- vector(); wp_valid <- vector();
+
 Test_Prediction <- read.csv("contribution_example.csv",sep = ";");
 
 
@@ -60,6 +60,8 @@ for (i in 1:6){
     mutate(ws_av = rowMeans(cbind(ws, ws12, ws24, ws36), na.rm = TRUE));
   traintest <- traintest %>% 
     mutate(wd_av = rowMeans(cbind(wd, wd12, wd24, wd36), na.rm = TRUE));
+  
+  traintest[26125:26160, c("date", "hors")] <- cbind(rep(c(2012062312, 2012062400, 2012062412), each = 12), seq(1,12));
   
   traintest <- subset(traintest, select = -c(u:wd36));
   
@@ -108,9 +110,11 @@ for (i in 1:6){
 }
 
 
-for (i in 1:6){
+for (i in 2:4){
   
   traintest <- get(paste0("wp",i,"traintest"));
+  
+  Valid_Prediction <- vector(); wp_valid <- vector();
   
   if (i == 1){
     traintest <- traintest %>% left_join(wp4traintest, by = "datetime") %>% 
@@ -135,7 +139,7 @@ for (i in 1:6){
   traintest <- traintest %>% left_join(target, by = "datetime");
   
   
-  inValid <- 13141:18720; inTrain <- 1:13140;
+  inTrain <- 1:13140; inValid <- 13141:18720; 
   inTest <- which(is.na(traintest[,"wp"])); 
   testing <- traintest[inTest,]; trainvalid <- traintest[-inTest,]; 
   training <- trainvalid[inTrain,]; valid <- trainvalid[inValid,];
@@ -144,10 +148,10 @@ for (i in 1:6){
   #assign(paste0("wp",i,"valid"),valid);
   #assign(paste0("wp",i,"test"),testing);
   
-  inTest <- 1:240; test <- testing[inTest,];
+  inTest <- 1:48; test <- testing[inTest,];
   
   
-  for (j in 1:31){
+  for (j in 1:155){
     
     dtrain_cat <- catboost.load_pool(data.matrix(subset(training, select = -wp)), 
                                      label = training$wp^(1/4));
@@ -206,18 +210,18 @@ for (i in 1:6){
     Test_Pred[Test_Pred < 0] <- 0;Test_Pred[Test_Pred > 1] <- 1;
     Test_Prediction[inTest, i+1] <- Test_Pred;
     
-    if (j == 31)  {
+    if (j == 155)  {
+      print(MAE(Valid_Prediction,wp_valid));
       break
     }
     
-    training <- rbind(training,valid[1:180, ]); 
-    inValid <- inValid[-(1:180)]; inTest <- inTest + 240; 
+    training <- rbind(training,valid[1:36, ]); 
+    inValid <- inValid[-(1:36)]; inTest <- inTest + 48; 
     valid <- trainvalid[inValid,]; test <- testing[inTest,];
   }
-  print(MAE(Valid_Prediction,wp_valid));
   
   }
 
-write.csv2(Test_Prediction, file = "Test_Results.csv", row.names = FALSE, quote = FALSE);
+write.csv2(Test_Prediction, file = "Test_Results_9.csv", row.names = FALSE, quote = FALSE);
 stopCluster(clus);
 registerDoSEQ();

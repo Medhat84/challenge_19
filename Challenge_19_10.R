@@ -19,7 +19,7 @@ der2 <- function(x) {y = der1(x) - lag(der1(x));y[1] <- 0; return(y)};
 der1f <- function(x) {y = lead(x) - x; return(y)};
 der2f <- function(x) {y = lead(der1f(x)) - der1f(x); return(y)};
 
-Valid_Prediction <- vector(); wp_valid <- vector();
+
 Test_Prediction <- read.csv("contribution_example.csv",sep = ";");
 
 
@@ -110,9 +110,11 @@ for (i in 1:6){
 }
 
 
-for (i in 1:6){
+for (i in c(1, 5, 6)){
   
   traintest <- get(paste0("wp",i,"traintest"));
+  
+  Valid_Prediction <- vector(); wp_valid <- vector();
   
   if (i == 1){
     traintest <- traintest %>% left_join(wp4traintest, by = "datetime") %>% 
@@ -251,6 +253,7 @@ for (i in 1:6){
     Test_Prediction[inTest, i+1] <- Test_Pred;
     
     if (j == 155)  {
+      print(MAE(Valid_Prediction,wp_valid));
       break
     }
     
@@ -259,10 +262,9 @@ for (i in 1:6){
     inValid <- inValid[-(1:36)]; inTest <- inTest + 48; 
     valid <- trainvalid[inValid,]; test <- testing[inTest,];
   }
-  print(MAE(Valid_Prediction,wp_valid));
   
   }
 
-write.csv2(Test_Prediction, file = "Test_Results.csv", row.names = FALSE, quote = FALSE);
+write.csv2(Test_Prediction, file = "Test_Results_10.csv", row.names = FALSE, quote = FALSE);
 stopCluster(clus);
 registerDoSEQ();
