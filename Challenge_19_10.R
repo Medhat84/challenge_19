@@ -20,6 +20,7 @@ der1f <- function(x) {y = lead(x) - x; return(y)};
 der2f <- function(x) {y = lead(der1f(x)) - der1f(x); return(y)};
 
 
+Valid_Prediction <- vector(); wp_valid <- vector();
 Test_Prediction <- read.csv("contribution_example.csv",sep = ";");
 
 
@@ -110,11 +111,9 @@ for (i in 1:6){
 }
 
 
-for (i in c(1, 5, 6)){
+for (i in 1:6){
   
   traintest <- get(paste0("wp",i,"traintest"));
-  
-  Valid_Prediction <- vector(); wp_valid <- vector();
   
   if (i == 1){
     traintest <- traintest %>% left_join(wp4traintest, by = "datetime") %>% 
@@ -139,7 +138,7 @@ for (i in c(1, 5, 6)){
   traintest <- traintest %>% left_join(target, by = "datetime");
   
   
-  inTrain <- 1:10260; st_inValid <- 10261:13140; inValid <- 13141:18720;  
+  inTrain <- 1:12024; st_inValid <- 12025:13140; inValid <- 13141:18720;  
   inTest <- which(is.na(traintest[,"wp"])); 
   testing <- traintest[inTest,]; trainvalid <- traintest[-inTest,]; 
   training <- trainvalid[inTrain,]; valid <- trainvalid[inValid,];
@@ -149,10 +148,10 @@ for (i in c(1, 5, 6)){
   #assign(paste0("wp",i,"valid"),valid);
   #assign(paste0("wp",i,"test"),testing);
   
-  inTest <- 1:48; test <- testing[inTest,];
+  inTest <- 1:240; test <- testing[inTest,];
   
   
-  for (j in 1:155){
+  for (j in 1:31){
     
     dtrain_cat <- catboost.load_pool(data.matrix(subset(training, select = -wp)), 
                                      label = training$wp^(1/4));
@@ -252,19 +251,22 @@ for (i in c(1, 5, 6)){
     Test_Pred[Test_Pred < 0] <- 0;Test_Pred[Test_Pred > 1] <- 1;
     Test_Prediction[inTest, i+1] <- Test_Pred;
     
-    if (j == 155)  {
-      print(MAE(Valid_Prediction,wp_valid));
+    if (j == 31)  {
+      a <- length(wp_valid); b <- a+1-a/i; 
+      print(MAE(Valid_Prediction[b:a], wp_valid[b:a]));
       break
     }
     
-    training <- rbind(training, st_valid[1:36, ]);
-    st_valid <- rbind(st_valid[-(1:36), ], valid[1:36, ]);
-    inValid <- inValid[-(1:36)]; inTest <- inTest + 48; 
+    training <- rbind(training, st_valid[1:180, ]);
+    st_valid <- rbind(st_valid[-(1:180), ], valid[1:180, ]);
+    inValid <- inValid[-(1:180)]; inTest <- inTest + 240; 
     valid <- trainvalid[inValid,]; test <- testing[inTest,];
   }
   
-  }
+}
 
+rm("a","b");
+print(MAE(Valid_Prediction, wp_valid));
 write.csv2(Test_Prediction, file = "Test_Results_10.csv", row.names = FALSE, quote = FALSE);
 stopCluster(clus);
 registerDoSEQ();
