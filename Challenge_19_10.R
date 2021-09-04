@@ -138,7 +138,7 @@ for (i in 1:6){
   traintest <- traintest %>% left_join(target, by = "datetime");
   
   
-  inTrain <- 1:10260; st_inValid <- 10261:13140; inValid <- 13141:18720;  
+  inTrain <- 1:6570; st_inValid <- 6571:13140; inValid <- 13141:18720;  
   inTest <- which(is.na(traintest[,"wp"])); 
   testing <- traintest[inTest,]; trainvalid <- traintest[-inTest,]; 
   training <- trainvalid[inTrain,]; valid <- trainvalid[inValid,];
@@ -148,10 +148,10 @@ for (i in 1:6){
   #assign(paste0("wp",i,"valid"),valid);
   #assign(paste0("wp",i,"test"),testing);
   
-  inTest <- 1:1448; test <- testing[inTest,];
+  inTest <- 1:48; test <- testing[inTest,];
   
   
-  for (j in 1:5){
+  for (j in 1:155){
     
     dtrain_cat <- catboost.load_pool(data.matrix(subset(training, select = -wp)), 
                                      label = training$wp^(1/4));
@@ -251,15 +251,15 @@ for (i in 1:6){
     Test_Pred[Test_Pred < 0] <- 0;Test_Pred[Test_Pred > 1] <- 1;
     Test_Prediction[inTest, i+1] <- Test_Pred;
     
-    if (j == 5)  {
+    if (j == 155)  {
       a <- length(wp_valid); b <- a+1-a/i; 
       print(MAE(Valid_Prediction[b:a], wp_valid[b:a]));
       break
     }
     
-    training <- rbind(training, st_valid[1:1116, ]);
-    st_valid <- rbind(st_valid[-(1:1116), ], valid[1:1116, ]);
-    inValid <- inValid[-(1:1116)]; inTest <- inTest + 1448; 
+    training <- rbind(training, st_valid[1:36, ]);
+    st_valid <- rbind(st_valid[-(1:36), ], valid[1:36, ]);
+    inValid <- inValid[-(1:36)]; inTest <- inTest + 48; 
     valid <- trainvalid[inValid,]; test <- testing[inTest,];
   }
   
