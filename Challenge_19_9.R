@@ -1,6 +1,6 @@
 library(lightgbm);library(parallel);library(doParallel);library(lubridate);
 library(dplyr);library(zoo);library(caret);library(xgboost);library(catboost);
-clus <- makeCluster(detectCores()-0);
+clus <- makeCluster(detectCores()-2);
 registerDoParallel(clus);
 
 setwd("~/R/R Directory/challenge_19");
@@ -121,18 +121,11 @@ for (i in 1:6){
       left_join(wp6traintest, by = "datetime");
   }
   if (i == 4){
-    traintest <- traintest %>% left_join(wp1traintest, by = "datetime") %>% 
-      left_join(wp5traintest, by = "datetime");
+    traintest <- traintest %>% left_join(wp1traintest, by = "datetime");
   }
-  if (i == 5){
-    traintest <- traintest %>% left_join(wp1traintest, by = "datetime") %>% 
-      left_join(wp4traintest, by = "datetime");
-  }
+  
   if (i == 6){
-    traintest <- traintest %>% left_join(wp1traintest, by = "datetime") %>% 
-      left_join(wp2traintest, by = "datetime") %>% 
-      left_join(wp4traintest, by = "datetime") %>% 
-      left_join(wp5traintest, by = "datetime");
+    traintest <- traintest %>% left_join(wp1traintest, by = "datetime");
   }
   
   target <- trainds %>% select(datetime, wp = 1+i);
@@ -143,15 +136,12 @@ for (i in 1:6){
   inTest <- which(is.na(traintest[,"wp"])); 
   testing <- traintest[inTest,]; trainvalid <- traintest[-inTest,]; 
   training <- trainvalid[inTrain,]; valid <- trainvalid[inValid,];
-  #assign(paste0("wp",i,"trainvalid"),trainvalid);
-  #assign(paste0("wp",i,"train"),training); 
-  #assign(paste0("wp",i,"valid"),valid);
-  #assign(paste0("wp",i,"test"),testing);
-  
-  inTest <- 1:1488; test <- testing[inTest,];
   
   
-  for (j in 1:5){
+  inTest <- 1:48; test <- testing[inTest,];
+  
+  
+  for (j in 1:155){
     
     dtrain_cat <- catboost.load_pool(data.matrix(subset(training, select = -wp)), 
                                      label = training$wp^(1/4));
@@ -160,11 +150,11 @@ for (i in 1:6){
     dtest_cat <- catboost.load_pool(data.matrix(subset(test, select = -wp)));
     
     mdl_cat <- catboost.train(dtrain_cat, dvalid_cat, 
-                              params = list(iterations = 1000, learning_rate = 0.1, 
+                              params = list(iterations = 750, learning_rate = 0.1, 
                                             depth = 4, logging_level = 'Silent', 
                                             l2_leaf_reg = 0.2, rsm = 1, 
                                             loss_function = 'MAE', od_type = 'Iter',
-                                            od_wait = 100, subsample = 0.8));
+                                            od_wait = 75, subsample = 0.8));
     
     dtrain_lgbm <- lgb.Dataset(data =data.matrix(subset(training, select = -wp)), 
                                label = training$wp^(1/3));
@@ -172,10 +162,11 @@ for (i in 1:6){
                                label = valid$wp^(1/3));
     dtest_lgbm <- data.matrix(subset(test, select = -wp));
     
-    mdl_lgbm <- lightgbm(data = dtrain_lgbm, nrounds = 150, boosting_type = 'gbdt',
+    mdl_lgbm <- lightgbm(data = dtrain_lgbm, nrounds = 500, boosting_type = 'gbdt',
                          verbose = -1, learning_rate = 0.1, max_depth = 10, 
                          valids = list(valids = dvalid_lgbm),
-                         obj = "regression_l1", early_stopping_rounds = 15);
+                         obj = "regression_l1", early_stopping_rounds = 50);
+    
     
     dtrain_xgb <- xgb.DMatrix(data =data.matrix(subset(training, select = -wp)), 
                               label = training$wp^(1/2));
@@ -199,7 +190,7 @@ for (i in 1:6){
     
     Valid_Pred <- (Valid_Pred_cat + Valid_Pred_lgbm + Valid_Pred_xgb)/3;
     Valid_Pred[Valid_Pred < 0] <- 0;Valid_Pred[Valid_Pred > 1] <- 1;
-    Valid_Prediction <- c(Valid_Prediction,Valid_Pred); wp_valid <- c(wp_valid,valid$wp);
+    Valid_Prediction <- c(Valid_Prediction,Valid_Pred[1:36]); wp_valid <- c(wp_valid,valid$wp[1:36]);
     
     
     Test_Pred_cat <- catboost.predict(mdl_cat, dtest_cat)^4; 
@@ -210,14 +201,14 @@ for (i in 1:6){
     Test_Pred[Test_Pred < 0] <- 0;Test_Pred[Test_Pred > 1] <- 1;
     Test_Prediction[inTest, i+1] <- Test_Pred;
     
-    if (j == 5)  {
+    if (j == 155)  {
       a <- length(wp_valid); b <- a+1-a/i; 
       print(MAE(Valid_Prediction[b:a], wp_valid[b:a]));
       break
     }
     
-    training <- rbind(training,valid[1:1116, ]); 
-    inValid <- inValid[-(1:1116)]; inTest <- inTest + 1488; 
+    training <- rbind(training,valid[1:36, ]); 
+    inValid <- inValid[-(1:36)]; inTest <- inTest + 48; 
     valid <- trainvalid[inValid,]; test <- testing[inTest,];
   }
   
