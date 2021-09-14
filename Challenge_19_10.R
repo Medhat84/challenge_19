@@ -120,33 +120,23 @@ for (i in 1:6){
       left_join(wp6traintest, by = "datetime");
   }
   if (i == 4){
-    traintest <- traintest %>% left_join(wp1traintest, by = "datetime") %>% 
-      left_join(wp5traintest, by = "datetime");
+    traintest <- traintest %>% left_join(wp1traintest, by = "datetime");
   }
-  if (i == 5){
-    traintest <- traintest %>% left_join(wp1traintest, by = "datetime") %>% 
-      left_join(wp4traintest, by = "datetime");
-  }
+  
   if (i == 6){
-    traintest <- traintest %>% left_join(wp1traintest, by = "datetime") %>% 
-      left_join(wp2traintest, by = "datetime") %>% 
-      left_join(wp4traintest, by = "datetime") %>% 
-      left_join(wp5traintest, by = "datetime");
+    traintest <- traintest %>% left_join(wp1traintest, by = "datetime");
   }
   
   target <- trainds %>% select(datetime, wp = 1+i);
   traintest <- traintest %>% left_join(target, by = "datetime");
   
   
-  inTrain <- 1:6570; st_inValid <- 6571:13140; inValid <- 13141:18720;  
+  inTrain <- 1:8760; inValid <- 8761:13140; st_inValid <- 13141:18720;  
   inTest <- which(is.na(traintest[,"wp"])); 
   testing <- traintest[inTest,]; trainvalid <- traintest[-inTest,]; 
   training <- trainvalid[inTrain,]; valid <- trainvalid[inValid,];
   st_valid <- trainvalid[st_inValid,]
-  #assign(paste0("wp",i,"trainvalid"),trainvalid);
-  #assign(paste0("wp",i,"train"),training); 
-  #assign(paste0("wp",i,"valid"),valid);
-  #assign(paste0("wp",i,"test"),testing);
+  
   
   inTest <- 1:48; test <- testing[inTest,];
   
@@ -160,11 +150,11 @@ for (i in 1:6){
     
     
     mdl_cat <- catboost.train(dtrain_cat, dvalid_cat, 
-                              params = list(iterations = 1000, learning_rate = 0.1, 
+                              params = list(iterations = 750, learning_rate = 0.1, 
                                             depth = 4, logging_level = 'Silent', 
                                             l2_leaf_reg = 0.2, rsm = 1, 
                                             loss_function = 'MAE', od_type = 'Iter',
-                                            od_wait = 100, subsample = 0.8));
+                                            od_wait = 75, subsample = 0.8));
     
     dtrain_lgbm <- lgb.Dataset(data =data.matrix(subset(training, select = -wp)), 
                                label = training$wp^(1/3));
@@ -172,10 +162,11 @@ for (i in 1:6){
                                label = valid$wp^(1/3));
     
     
-    mdl_lgbm <- lightgbm(data = dtrain_lgbm, nrounds = 150, boosting_type = 'gbdt',
+    mdl_lgbm <- lightgbm(data = dtrain_lgbm, nrounds = 500, boosting_type = 'gbdt',
                          verbose = -1, learning_rate = 0.1, max_depth = 10, 
                          valids = list(valids = dvalid_lgbm),
-                         obj = "regression_l1", early_stopping_rounds = 15);
+                         obj = "regression_l1", early_stopping_rounds = 50);
+    
     
     dtrain_xgb <- xgb.DMatrix(data =data.matrix(subset(training, select = -wp)), 
                               label = training$wp^(1/2));
@@ -205,7 +196,7 @@ for (i in 1:6){
     
     
     st_dvalid_cat <- catboost.load_pool(data.matrix(subset(st_valid, select = -wp)));
-    st_dvalid_lgbm <- data.matrix(subset(st_valid, select = -wp));
+    #st_dvalid_lgbm <- data.matrix(subset(st_valid, select = -wp));
     st_dvalid_xgb <- xgb.DMatrix(data =data.matrix(subset(st_valid, select = -wp)));
     
     st_Valid_Pred_cat <- catboost.predict(mdl_cat, st_dvalid_cat)^4; 
@@ -229,10 +220,10 @@ for (i in 1:6){
     
     
     Valid_Pred <- predict(st_mdl_xgb, st_dvalid)^2;
-    Valid_Pred[Valid_Pred < 0] <- 0;Valid_Pred[Valid_Pred > 1] <- 1;
+    Valid_Pred[Valid_Pred < 0] <- 0; Valid_Pred[Valid_Pred > 1] <- 1;
     #print(cbind(ValidMAE = MAE(Valid_Pred,st_valid$wp), mdlMAE = st_mdl_xgb$best_score));
     #print(st_mdl_xgb$best_iteration)
-    Valid_Prediction <- c(Valid_Prediction,Valid_Pred); wp_valid <- c(wp_valid,st_valid$wp);
+    Valid_Prediction <- c(Valid_Prediction, Valid_Pred[1:36]); wp_valid <- c(wp_valid, st_valid$wp[1:36]);
     
     
     st_dtest_cat <- catboost.load_pool(data.matrix(subset(test, select = -wp)));
@@ -257,10 +248,10 @@ for (i in 1:6){
       break
     }
     
-    training <- rbind(training, st_valid[1:36, ]);
-    st_valid <- rbind(st_valid[-(1:36), ], valid[1:36, ]);
-    inValid <- inValid[-(1:36)]; inTest <- inTest + 48; 
-    valid <- trainvalid[inValid,]; test <- testing[inTest,];
+    training <- rbind(training, valid[1:36, ]);
+    valid <- rbind(valid[-(1:36), ], st_valid[1:36, ]);
+    st_inValid <- st_inValid[-(1:36)]; inTest <- inTest + 48; 
+    st_valid <- trainvalid[st_inValid,]; test <- testing[inTest,];
   }
   
 }
