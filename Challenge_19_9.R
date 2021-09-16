@@ -105,6 +105,7 @@ for (i in 1:6){
   traintest <- traintest %>% 
     mutate_at(vars("datetime"), list(hour = hour, yday = yday, week = week, 
                                      wday = wday));
+  traintest <- traintest %>% mutate(yday_h = as.numeric(paste0(yday, hour)));
   
   
   assign(paste0("wp",i,"traintest"), traintest);
@@ -119,13 +120,16 @@ for (i in 1:6){
   if (i == 1){
     traintest <- traintest %>% left_join(wp4traintest, by = "datetime") %>% 
       left_join(wp6traintest, by = "datetime");
+    #traintest <- traintest[!duplicated(as.list(traintest))];
   }
   if (i == 4){
     traintest <- traintest %>% left_join(wp1traintest, by = "datetime");
+    #traintest <- traintest[!duplicated(as.list(traintest))];
   }
   
   if (i == 6){
     traintest <- traintest %>% left_join(wp1traintest, by = "datetime");
+    #traintest <- traintest[!duplicated(as.list(traintest))];
   }
   
   target <- trainds %>% select(datetime, wp = 1+i);
@@ -144,9 +148,9 @@ for (i in 1:6){
   for (j in 1:155){
     
     dtrain_cat <- catboost.load_pool(data.matrix(subset(training, select = -wp)), 
-                                     label = training$wp^(1/4));
+                                     label = training$wp^(1/2));
     dvalid_cat <- catboost.load_pool(data.matrix(subset(valid, select = -wp)), 
-                                     label = valid$wp^(1/4));
+                                     label = valid$wp^(1/2));
     dtest_cat <- catboost.load_pool(data.matrix(subset(test, select = -wp)));
     
     mdl_cat <- catboost.train(dtrain_cat, dvalid_cat, 
@@ -183,22 +187,27 @@ for (i in 1:6){
                                        eval_metric = "mae"));
     
     
-    Valid_Pred_cat <- catboost.predict(mdl_cat, dvalid_cat)^4; 
+    Valid_Pred_cat <- catboost.predict(mdl_cat, dvalid_cat)^2; 
     Valid_Pred_lgbm <- predict(mdl_lgbm, data.matrix(subset(valid, select = -wp)))^3; 
     Valid_Pred_xgb <- predict(mdl_xgb, dvalid_xgb)^2; 
     
-    
+    Valid_Pred_cat[Valid_Pred_cat < 0] <- 0;Valid_Pred_cat[Valid_Pred_cat > 1] <- 1;
+    Valid_Pred_lgbm[Valid_Pred_lgbm < 0] <- 0;Valid_Pred_lgbm[Valid_Pred_lgbm > 1] <- 1;
+    Valid_Pred_xgb[Valid_Pred_xgb < 0] <- 0;Valid_Pred_xgb[Valid_Pred_xgb > 1] <- 1;
     Valid_Pred <- (Valid_Pred_cat + Valid_Pred_lgbm + Valid_Pred_xgb)/3;
-    Valid_Pred[Valid_Pred < 0] <- 0;Valid_Pred[Valid_Pred > 1] <- 1;
+    #Valid_Pred[Valid_Pred < 0] <- 0;Valid_Pred[Valid_Pred > 1] <- 1;
     Valid_Prediction <- c(Valid_Prediction,Valid_Pred[1:36]); wp_valid <- c(wp_valid,valid$wp[1:36]);
     
     
-    Test_Pred_cat <- catboost.predict(mdl_cat, dtest_cat)^4; 
+    Test_Pred_cat <- catboost.predict(mdl_cat, dtest_cat)^2; 
     Test_Pred_lgbm <- predict(mdl_lgbm, dtest_lgbm)^3;
     Test_Pred_xgb <- predict(mdl_xgb, dtest_xgb)^2;
     
+    Test_Pred_cat[Test_Pred_cat < 0] <- 0;Test_Pred_cat[Test_Pred_cat > 1] <- 1;
+    Test_Pred_lgbm[Test_Pred_lgbm < 0] <- 0;Test_Pred_lgbm[Test_Pred_lgbm > 1] <- 1;
+    Test_Pred_xgb[Test_Pred_xgb < 0] <- 0;Test_Pred_xgb[Test_Pred_xgb > 1] <- 1;
     Test_Pred <- (Test_Pred_cat + Test_Pred_lgbm + Test_Pred_xgb)/3;
-    Test_Pred[Test_Pred < 0] <- 0;Test_Pred[Test_Pred > 1] <- 1;
+    #Test_Pred[Test_Pred < 0] <- 0;Test_Pred[Test_Pred > 1] <- 1;
     Test_Prediction[inTest, i+1] <- Test_Pred;
     
     if (j == 155)  {
