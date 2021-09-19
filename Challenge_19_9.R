@@ -1,6 +1,6 @@
 library(lightgbm);library(parallel);library(doParallel);library(lubridate);
 library(dplyr);library(zoo);library(caret);library(xgboost);library(catboost);
-clus <- makeCluster(detectCores()-2);
+clus <- makeCluster(detectCores()-0);
 registerDoParallel(clus);
 
 setwd("~/R/R Directory/challenge_19");
@@ -136,7 +136,7 @@ for (i in 1:6){
   traintest <- traintest %>% left_join(target, by = "datetime");
   
   
-  inTrain <- 1:13140; inValid <- 13141:18720; 
+  inTrain <- 1:13176; inValid <- 13177:18720; 
   inTest <- which(is.na(traintest[,"wp"])); 
   testing <- traintest[inTest,]; trainvalid <- traintest[-inTest,]; 
   training <- trainvalid[inTrain,]; valid <- trainvalid[inValid,];
@@ -216,9 +216,11 @@ for (i in 1:6){
       break
     }
     
-    training <- rbind(training,valid[1:36, ]); 
-    inValid <- inValid[-(1:36)]; inTest <- inTest + 48; 
-    valid <- trainvalid[inValid,]; test <- testing[inTest,];
+    if (j < 154) {
+      training <- rbind(training,valid[1:36, ]); 
+      inValid <- inValid[-(1:36)]; valid <- trainvalid[inValid,]
+    }
+    inTest <- inTest + 48; test <- testing[inTest,];
   }
   
 }
