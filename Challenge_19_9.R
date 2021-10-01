@@ -136,7 +136,7 @@ for (i in 1:6){
   traintest <- traintest %>% left_join(target, by = "datetime");
   
   
-  inTrain <- 1:13176; inValid <- 13177:18720; 
+  inTrain <- 1:13176; inValid <- 13177:13212; 
   inTest <- which(is.na(traintest[,"wp"])); 
   testing <- traintest[inTest,]; trainvalid <- traintest[-inTest,]; 
   training <- trainvalid[inTrain,]; valid <- trainvalid[inValid,];
@@ -218,7 +218,7 @@ for (i in 1:6){
     
     if (j < 154) {
       training <- rbind(training,valid[1:36, ]); 
-      inValid <- inValid[-(1:36)]; valid <- trainvalid[inValid,]
+      inValid <- inValid + 36; valid <- trainvalid[inValid,]
     }
     inTest <- inTest + 48; test <- testing[inTest,];
   }
