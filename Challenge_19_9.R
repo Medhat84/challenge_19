@@ -9,10 +9,6 @@ trainds$datetime <- ymd_h(trainds$date); trainds <- trainds[c(8,2:7)]
 set.seed(145);
 
 
-#inTrain_9 <- 9+which(seq(26159,0) %% 84 > 56);
-#inTrain_18 <- 18+which(seq(26159,0) %% 84 > 65);
-#inTrain_27 <- 27+which(seq(26159,0) %% 84 > 74);
-
 stdev <- function(x, ...) {x<- x[!is.na(x)];sqrt(sum((x-mean(x))^2))/length(x)};
 der1 <- function(x) {y = x - lag(x);y[1] <- 0; return(y)};
 der2 <- function(x) {y = der1(x) - lag(der1(x));y[1] <- 0; return(y)};
@@ -44,9 +40,6 @@ for (i in 1:6){
   
   rm("tmpa","tmpb","tmpc","a","b","c")
   
-  #traintest[inTrain_9, names(traintest) %in% c("u", "v", "ws", "wd")] <- NA;
-  #traintest[inTrain_18, names(traintest) %in% c("u12", "v12", "ws12", "wd12")] <- NA;
-  #traintest[inTrain_27, names(traintest) %in% c("u24", "v24", "ws24", "wd24")] <- NA;
   
   traintest <- traintest %>% mutate(unr = coalesce(u, u12, u24, u36));
   traintest <- traintest %>% mutate(vnr = coalesce(v, v12, v24, v36));
@@ -84,12 +77,7 @@ for (i in 1:6){
                                          select(datetime, wsnr_d1f:wsnr3_d2f), 
                                        by = "datetime");
   
-  #traintest <- traintest %>% left_join(
-   # traintest %>% group_by(date) %>% summarise_at(vars(wsnr:wdnr, wsnr3), 
-    #                                              list(av12 = mean, mx12 = max,
-     #                                                  mn12 = min)), 
-    #by = "date");
-  
+ 
   traintest <- traintest %>%
     mutate_at(vars(wsnr:wdnr),list(ma4 = rollmeanr), k = 4, fill = 0, na.rm=TRUE);
   traintest <- traintest %>%
@@ -120,23 +108,20 @@ for (i in 1:6){
   if (i == 1){
     traintest <- traintest %>% left_join(wp4traintest, by = "datetime") %>% 
       left_join(wp6traintest, by = "datetime");
-    #traintest <- traintest[!duplicated(as.list(traintest))];
   }
   if (i == 4){
     traintest <- traintest %>% left_join(wp1traintest, by = "datetime");
-    #traintest <- traintest[!duplicated(as.list(traintest))];
   }
   
   if (i == 6){
     traintest <- traintest %>% left_join(wp1traintest, by = "datetime");
-    #traintest <- traintest[!duplicated(as.list(traintest))];
   }
   
   target <- trainds %>% select(datetime, wp = 1+i);
   traintest <- traintest %>% left_join(target, by = "datetime");
   
   
-  inTrain <- 1:13176; inValid <- 13177:13248; 
+  inTrain <- 1:13176; inValid <- 13177:13464; 
   inTest <- which(is.na(traintest[,"wp"])); 
   testing <- traintest[inTest,]; trainvalid <- traintest[-inTest,]; 
   training <- trainvalid[inTrain,]; valid <- trainvalid[inValid,];
@@ -195,7 +180,6 @@ for (i in 1:6){
     Valid_Pred_lgbm[Valid_Pred_lgbm < 0] <- 0;Valid_Pred_lgbm[Valid_Pred_lgbm > 1] <- 1;
     Valid_Pred_xgb[Valid_Pred_xgb < 0] <- 0;Valid_Pred_xgb[Valid_Pred_xgb > 1] <- 1;
     Valid_Pred <- (Valid_Pred_cat + Valid_Pred_lgbm + Valid_Pred_xgb)/3;
-    #Valid_Pred[Valid_Pred < 0] <- 0;Valid_Pred[Valid_Pred > 1] <- 1;
     Valid_Prediction <- c(Valid_Prediction,Valid_Pred[1:36]); wp_valid <- c(wp_valid,valid$wp[1:36]);
     
     
@@ -207,7 +191,6 @@ for (i in 1:6){
     Test_Pred_lgbm[Test_Pred_lgbm < 0] <- 0;Test_Pred_lgbm[Test_Pred_lgbm > 1] <- 1;
     Test_Pred_xgb[Test_Pred_xgb < 0] <- 0;Test_Pred_xgb[Test_Pred_xgb > 1] <- 1;
     Test_Pred <- (Test_Pred_cat + Test_Pred_lgbm + Test_Pred_xgb)/3;
-    #Test_Pred[Test_Pred < 0] <- 0;Test_Pred[Test_Pred > 1] <- 1;
     Test_Prediction[inTest, i+1] <- Test_Pred;
     
     if (j == 155)  {
@@ -216,9 +199,13 @@ for (i in 1:6){
       break
     }
     
-    if (j < 153) {
+    if (j < 147) {
       training <- rbind(training,valid[1:36, ]); 
-      inValid <- inValid + 36; valid <- trainvalid[inValid,]
+      inValid <- inValid+36; valid <- trainvalid[inValid,]
+    }
+    if (j > 146 & j < 154) {
+      training <- rbind(training,valid[1:36, ]); 
+      inValid <- inValid[-(1:36)]; valid <- trainvalid[inValid,]
     }
     inTest <- inTest + 48; test <- testing[inTest,];
   }
