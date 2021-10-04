@@ -4,12 +4,10 @@ clus <- makeCluster(detectCores()-0);
 registerDoParallel(clus);
 
 setwd("~/R/R Directory/challenge_19");
-trainds <- read.csv("train.csv"); testds <- read.csv("test.csv");
+trainds <- read.csv("train.csv");
 trainds$datetime <- ymd_h(trainds$date); trainds <- trainds[c(8,2:7)]
 set.seed(145);
 
-
-stdev <- function(x, ...) {x<- x[!is.na(x)];sqrt(sum((x-mean(x))^2))/length(x)};
 der1 <- function(x) {y = x - lag(x);y[1] <- 0; return(y)};
 der2 <- function(x) {y = der1(x) - lag(der1(x));y[1] <- 0; return(y)};
 der1f <- function(x) {y = lead(x) - x; return(y)};
@@ -103,7 +101,8 @@ for (i in 1:6){
 for (i in 1:6){
   
   traintest <- get(paste0("wp",i,"traintest"));
-
+  
+  inValid_ext <- setdiff(which(seq(13139,0) %% 84 < 36), 1:36);
   
   if (i == 1){
     traintest <- traintest %>% left_join(wp4traintest, by = "datetime") %>% 
@@ -121,7 +120,7 @@ for (i in 1:6){
   traintest <- traintest %>% left_join(target, by = "datetime");
   
   
-  inTrain <- 1:13176; inValid <- 13177:13464; 
+  inTrain <- 1:13176; inValid <- 13177:18720; 
   inTest <- which(is.na(traintest[,"wp"])); 
   testing <- traintest[inTest,]; trainvalid <- traintest[-inTest,]; 
   training <- trainvalid[inTrain,]; valid <- trainvalid[inValid,];
@@ -199,15 +198,16 @@ for (i in 1:6){
       break
     }
     
-    if (j < 147) {
-      training <- rbind(training,valid[1:36, ]); 
-      inValid <- inValid+36; valid <- trainvalid[inValid,]
-    }
-    if (j > 146 & j < 154) {
-      training <- rbind(training,valid[1:36, ]); 
-      inValid <- inValid[-(1:36)]; valid <- trainvalid[inValid,]
-    }
+    training <- rbind(training,valid[1:36, ]); 
+    inValid <- inValid[-(1:36)]; valid <- trainvalid[inValid,];
     inTest <- inTest + 48; test <- testing[inTest,];
+    
+    if (j > 104) {
+      training <- training[-inValid_ext[1:36], ]
+      inValid <- c(inValid, inValid_ext[1:36]); valid <- trainvalid[inValid,];
+      inValid_ext <- inValid_ext[-(1:36)]
+      }
+        
   }
   
 }
